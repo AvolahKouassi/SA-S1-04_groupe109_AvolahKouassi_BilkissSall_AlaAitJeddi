@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Présentation web de la SAÉ S1.04 – Analyse des données de KDou et indicateurs.">
+  <title>KDou — Analyse & indicateurs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="hero" id="accueil">
+    <nav class="navbar" aria-label="Navigation principale">
+      <a class="brand" href="#accueil"><span> SAÉ S1.04 </span></a>
+      <div class="nav-links">
+        <a href="#indicateurs">Indicateurs</a>
+        <a href="#methode">Méthode</a>
+        <a href="#bilan">Bilan</a>
+      </div>
+    </nav>
+
+    <div class="hero-content">
+      <p class="eyebrow">CRÉATION D’UNE BASE DE DONNÉES</p>
+      <h1>Présentation<br><em>WEB</em></h1>
+      <p class="hero-intro">Une exploration de la base KDou pour comprendre son activité, suivre ses ventes et accompagner son ambition éco-responsable.</p>
+      <a class="button button-light" href="#indicateurs">Découvrir les indicateurs <span aria-hidden="true">↘</span></a>
+    </div>
+  </header>
+
+  <main>
+    <section class="section indicators-section" id="indicateurs">
+      <div class="section-heading">
+        <p class="eyebrow">01 — LES INDICATEURS</p>
+        <h2>Des données aux <em>décisions.</em></h2>
+        <p class="section-desc">Les quatre indicateurs obligatoires (requêtes 2 à 5) sont présentés en premier. Ils sont suivis de trois autres indicateurs, numérotés 1, 2 et 3.</p>
+      </div>
+
+      <article class="indicator-card">
+        <div class="indicator-layout">
+          <div class="indicator-copy">
+            <h3>2.Quel chiffre d’affaires est généré avec les fournisseurs de l’Union européenne&nbsp;?</h3>
+            <p>Cet indicateur mesure le chiffre d’affaires associé aux produits fournis par des pays membres de l’UE. Il permet d’étudier la place des approvisionnements européens dans l’activité de KDou.</p>
+            <p class="method-note"><strong>Calcul retenu :</strong> prix de vente estimé = coût d’achat × coefficient de marge. Le CA tient compte des quantités vendues et des remises.</p>
+            <details class="sql-details">
+              <summary>Afficher la requête SQL</summary>
+              <pre><code>SELECT Sum(
+    D.[Quantité] * P.CoutAchat * C.CoefMarge
+    * (1 - D.[Remise (%)])
+) AS CA_Fournisseurs_UE
+FROM ((((DetailCommande AS D
+INNER JOIN Produit AS P
+    ON D.[Réf produit] = P.RefProd)
+INNER JOIN Categorie AS C
+    ON P.CodeCateg = C.CodeCateg)
+INNER JOIN Fournisseur AS F
+    ON P.NoFour = F.NoFour)
+INNER JOIN Pays AS Y
+    ON F.NoPays = Y.NoPays)
+WHERE Y.UE = 'Membre';</code></pre>
+            </details>
+          </div>
+          <div class="result-area">
+            <div class="screenshot-placeholder">
+              <strong><img src="Captures/res_requete2.png" alt="Capture d'écran du résultat"></strong>
+              <span>Résultat Access : CA total des fournisseurs UE</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="indicator-card">
+        <div class="indicator-layout">
+          <div class="indicator-copy">
+            <h3>3.Quel est le chiffre d’affaires annuel des desserts et des boissons&nbsp;?</h3>
+            <p>Le CA est calculé par année et par catégorie afin de comparer le poids commercial des desserts et des boissons. Cette lecture peut aider KDou à mieux connaître la composition de ses ventes.</p>
+            <p class="method-note"><strong>Lecture :</strong> chaque ligne du résultat correspond à une année et à une catégorie alimentaire.</p>
+            <details class="sql-details">
+              <summary>Afficher la requête SQL</summary>
+              <pre><code>SELECT Year(Cm.DateCde) AS Annee,
+       C.NomCateg,
+       Sum(D.[Quantité] * P.CoutAchat * C.CoefMarge
+       * (1 - D.[Remise (%)])) AS CA
+FROM (((Commande AS Cm
+INNER JOIN DetailCommande AS D
+    ON Cm.[N° commande] = D.[N° commande])
+INNER JOIN Produit AS P
+    ON D.[Réf produit] = P.RefProd)
+INNER JOIN Categorie AS C
+    ON P.CodeCateg = C.CodeCateg)
+WHERE C.NomCateg IN ('Desserts', 'Boissons')
+GROUP BY Year(Cm.DateCde), C.NomCateg
+ORDER BY Year(Cm.DateCde), C.NomCateg;</code></pre>
+            </details>
+          </div>
+          <div class="result-area">
+            <div class="screenshot-placeholder">
+              <strong><img src="Captures/res_requete3.png" alt="Capture d'écran du résultat"></strong>
+              <span>Résultat Access : CA par année et catégorie</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="indicator-card">
+        <div class="indicator-topline"><span class="tag tag-sand">OFFRE COMMERCIALE</span></div>
+        <div class="indicator-layout">
+          <div class="indicator-copy">
+            <h3>4.Combien de produits carnés n’ont jamais été commandés&nbsp;?</h3>
+            <p>On assimile ici les produits carnés à la catégorie « Viandes ». La requête compte les produits de cette catégorie qui n’apparaissent dans aucune ligne de détail de commande.</p>
+            <p class="method-note"><strong>Interprétation :</strong> « actuellement non commandés » signifie ici « jamais commandés dans les données disponibles ».</p>
+            <details class="sql-details">
+              <summary>Afficher la requête SQL</summary>
+              <pre><code>SELECT Count(*) AS NbProduitsCarnesNonCommandes
+FROM Produit AS P
+INNER JOIN Categorie AS C
+    ON P.CodeCateg = C.CodeCateg
+WHERE C.NomCateg = 'Viandes'
+AND P.RefProd NOT IN (
+    SELECT [Réf produit]
+    FROM DetailCommande
+);</code></pre>
+            </details>
+          </div>
+          <div class="result-area">
+            <div class="screenshot-placeholder">
+              <strong><img src="Captures/res_requete4.png" alt="Capture d'écran du résultat"></strong>
+              <span>Résultat Access : nombre de produits carnés</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="indicator-card">
+        <div class="indicator-topline"><span class="tag tag-blue">PARTENARIAT CLIENT</span></div>
+        <div class="indicator-layout">
+          <div class="indicator-copy">
+            <h3>5.Les clients pilotes ont-ils autant de commandes que leurs partenaires&nbsp;?</h3>
+            <p>La relation entre les clients est portée par le champ <code>CodeCliPart</code>. On compare ici le nombre de commandes de chaque pilote à celui de chacun de ses clients partenaires.</p>
+            <p class="method-note"><strong>Étape préalable :</strong> créer et enregistrer la requête <code>Q_NbCmd</code>, qui compte les commandes de chaque client, y compris zéro.</p>
+            <details class="sql-details">
+              <summary>1. Requête préalable — Q_NbCmd</summary>
+              <pre><code>SELECT K.CodeCli,
+       Count(C.[N° commande]) AS NbCmd
+FROM Clientele AS K
+LEFT JOIN Commande AS C
+    ON K.CodeCli = C.CodeCli
+GROUP BY K.CodeCli;</code></pre>
+            </details>
+            <details class="sql-details">
+              <summary>2. Comparaison pilote / partenaire</summary>
+              <pre><code>SELECT Pil.CodeCli AS CodePilote,
+       Pil.Societe AS Pilote,
+       N1.NbCmd AS NbCmdPilote,
+       Par.CodeCli AS CodePartenaire,
+       Par.Societe AS Partenaire,
+       N2.NbCmd AS NbCmdPartenaire
+FROM (((Clientele AS Par
+INNER JOIN Clientele AS Pil
+    ON Par.CodeCliPart = Pil.CodeCli)
+INNER JOIN Q_NbCmd AS N1
+    ON Pil.CodeCli = N1.CodeCli)
+INNER JOIN Q_NbCmd AS N2
+    ON Par.CodeCli = N2.CodeCli)
+WHERE N1.NbCmd = N2.NbCmd;</code></pre>
+            </details>
+          </div>
+          <div class="result-area">
+            <div class="screenshot-placeholder">
+              <strong><img src="Captures/res_requete5.png" alt="Capture d'écran du résultat" class="image-reduite"></strong>
+              <span>Résultat Access : couples pilote / partenaire à égalité</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <div class="extra-indicators">
+        <div class="extra-heading">
+          <div><h3 class="eyebrow">NOS TROIS INDICATEURS</h3></div>
+        </div>
+        <div class="extra-grid">
+          <article class="extra-card">
+            <span class="extra-number">1</span>
+            <h4> Quelles catégories contiennent le plus de produits jamais commandés ?</h4>
+            <p class="editable-hint">L'objectif est d'identifier les catégories dont certains produits n'ont jamais été commandés, afin d'aider Kdou à mieux adapter son catalogue à la demande.
+              L'intérêt est de repérer les catégories à examiner en  priorité, sans faire de conclusion hâtive concernant la rentabilité des produits. </p>
+            <details class="sql-details">
+              <summary>Afficher la requête SQL</summary>
+              <pre><code>SELECT C.NomCateg, COUNT(P.RefProd) AS NbNonCommandes
+FROM (Categorie AS C 
+INNER JOIN Produit AS P
+ON C.CodeCateg = P.CodeCateg)
+LEFT JOIN DetailCommande AS D
+ON P.RefProd = D.[Réf produit]
+WHERE D.[Réf produit] IS NULL
+GROUP BY C.NomCateg
+ORDER BY COUNT(P.RefProd) DESC;
+</code></pre>
+            </details>
+            <div class="small-placeholder">
+              <img src="Captures/res_indicateur1.png" alt="Capture d'écran du résultat" class="image-plus-reduite">
+            </div>
+          </article>
+          <article class="extra-card">
+            <span class="extra-number">2</span>
+            <!-- MODIFIER ICI : écrire le titre de votre indicateur n° 2 -->
+            <h4>Quels produits viennent de fournisseurs français ? (circuit court)</h4>
+            <!-- MODIFIER ICI : présenter la question, l’objectif et l’intérêt de l’indicateur 2 -->
+            <p class="editable-hint">Objectif : repérer les produits à faible transport.
+              Intérêt : les clients étant tous en France, ces produits sont les plus faciles à mettre en avant comme « locaux ».</p>
+            <details class="sql-details">
+              <summary>Afficher la requête SQL</summary>
+              <pre><code>SELECT P.NomProd, F.Societe AS Fournisseur, F.Ville
+FROM (Produit AS P
+      INNER JOIN Fournisseur AS F ON P.NoFour = F.NoFour)
+      INNER JOIN Pays AS Y ON F.NoPays = Y.NoPays
+WHERE Y.PaysFR = 'France'
+ORDER BY P.NomProd;</code></pre>
+            </details>
+            <div class="small-placeholder"><img src="Captures/res_indicateur2.png" alt="Capture d'écran du résultat" class="image-plus-reduite"></div>
+          </article>
+          <article class="extra-card">
+            <span class="extra-number">3</span>
+            <h4>Quelles catégories de produits dépendent le plus des fournisseurs hors Union européenne ?</h4>
+            <p class="editable-hint">Objectif : Calculer, pour chaque catégorie de produits, la part du chiffre d'affaires provenant des fournisseurs situés hors de l'Union européenne.
+              Intérêt : Cette information peut aider l'entreprise à privilégier des fournisseurs européens afin de réduire l'impact environnemental du transport et de renforcer son engagement écoresponsable,
+               tout en conservant une offre attractive pour ses clients.</p>
+            <details class="sql-details">
+              <summary>Afficher la requête SQL</summary>
+              <pre><code>SELECT
+C.NomCateg,
+
+Round(
+    Sum(
+        IIf(
+            Y.UE = "Hors",
+            P.CoutAchat * C.CoefMarge * D.Quantité * (1-D.[Remise (%)])
+            ,0
+        )
+    ), 0
+) AS CA_hors_UE,
+
+Round(
+    Sum(
+        P.CoutAchat * C.CoefMarge * D.Quantité * (1-D.[Remise (%)])
+    ), 0
+) AS CA_total,
+
+Round(
+    100 * Sum(
+        IIf(
+            Y.UE = "Hors",
+            P.CoutAchat * C.CoefMarge * D.Quantité * (1-D.[Remise (%)])
+            ,0
+        )
+    )
+    /
+    Sum(
+        P.CoutAchat * C.CoefMarge * D.Quantité * (1-D.[Remise (%)])
+    ), 1
+) AS Part_hors_UE
+FROM
+(((DetailCommande AS D
+INNER JOIN Produit AS P
+ON D.[Réf produit] = P.RefProd)
+INNER JOIN Categorie AS C
+ON P.CodeCateg = C.CodeCateg)
+INNER JOIN Fournisseur AS F
+ON P.NoFour = F.NoFour)
+INNER JOIN Pays AS Y
+ON F.NoPays = Y.NoPays
+
+GROUP BY
+C.NomCateg
+
+ORDER BY
+4 DESC;</code></pre>
+            </details>
+            <div class="small-placeholder"><img src="Captures/res_indicateur3.png" alt="Capture d'écran du résultat" class="image-plus-reduite"></div>
+          </article>
+        </div>
+      </div>
+
+      </div>
+    </section>
+
+    <section class="section method-section" id="methode">
+      <div class="section-heading">
+        <p class="eyebrow">02 — DÉMARCHE</p>
+        <h2>De la base au <em>résultat.</em></h2>
+      </div>
+      <div class="method-grid">
+        <article><span>01</span><h3>Explorer les tables</h3><p>Ouverture des tables Access et lecture du schéma relationnel pour repérer les clés primaires et étrangères.</p></article>
+        <article><span>02</span><h3>Vérifier les données</h3><p>Repérage des incohérences possibles : dates, doublons, formats et valeurs manquantes.</p></article>
+        <article><span>03</span><h3>Construire les requêtes</h3><p>Utilisation de filtres, jointures, sous-requêtes, calculs et regroupements SQL.</p></article>
+        <article><span>04</span><h3>Interpréter</h3><p>Lecture des résultats et justification des choix retenus pour transformer les données en indicateurs.</p></article>
+      </div>
+      <div class="note-box">
+        <strong>À retenir</strong>
+        <p>Le prix de vente n’étant pas directement enregistré, il est estimé par <code>CoutAchat × CoefMarge</code>. Le CA calculé est donc une estimation. La remise est stockée sous forme de fraction : 0,15 correspond à 15&nbsp;%.</p>
+      </div>
+    </section>
+
+    <section class="section review-section" id="bilan">
+      <div class="section-heading">
+        <p class="eyebrow">03 — BILAN</p>
+        <h2>Ce que les données <em>nous apprennent.</em></h2>
+      </div>
+      <div class="review-grid">
+        <div>
+          <h3>Remarques sur la qualité des données</h3>
+          <ul class="remark-list">
+            <li><strong>Commande 11116 :</strong> la date de livraison prévue est antérieure à la date de commande.</li>
+            <li><strong>Produit « LimoCoca » :</strong> le nom apparaît pour les références 125 et 139, avec des conditionnements et coûts différents.</li>
+            <li><strong>Client GOUMA :</strong> la ville indiquée est Paris, mais le code postal est 76001.</li>
+            <li><strong>Codes pays :</strong> la colonne des codes ISO mélange des formats à deux et trois lettres.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Difficultés et choix d’interprétation</h3>
+          <ul class="remark-list">
+            <li>Certains noms de champs Access comportent des espaces, accents ou caractères spéciaux : les crochets sont nécessaires en SQL.</li>
+            <li>Le conditionnement carton/verre est déduit du texte de <code>QteParUnit</code>, car aucun champ dédié n’existe.</li>
+            <li>Le terme « actuellement » est interprété comme « jamais commandé dans la base », dont les données s’arrêtent en 2021-2022.</li>
+            <li>Les jointures et les sous-requêtes demandent de vérifier attentivement les relations entre les tables.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="conclusion">
+        <span class="eyebrow">CONCLUSION</span>
+        <p>La qualité des données est essentielle pour produire des indicateurs fiables. En reliant les informations sur les produits, les fournisseurs, les commandes et les clients, KDou peut mieux comprendre son activité et identifier des pistes pour concilier rentabilité et responsabilité.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>SAÉ S1.04 · Création d’une base de données</p>
+    <a href="#accueil" class="back-top">Retour en haut ↑</a>
+  </footer>
+</body>
+</html>
